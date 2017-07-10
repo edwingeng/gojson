@@ -212,21 +212,29 @@ func Generate(input io.Reader, parser Parser, structName, pkgName string, tags [
 		return nil, err
 	}
 
-	switch iresult := iresult.(type) {
-	case map[interface{}]interface{}:
-		result = convertKeysToStrings(iresult)
-	case map[string]interface{}:
-		result = iresult
-	case []interface{}:
+	formatCode := func (t string) ([]byte, error) {
 		src := fmt.Sprintf("package %s\n\ntype %s %s\n",
 			pkgName,
 			structName,
-			typeForValue(iresult, structName, tags, subStructMap))
+			t)
 		formatted, err := format.Source([]byte(src))
 		if err != nil {
 			err = fmt.Errorf("error formatting: %s, was formatting\n%s", err, src)
 		}
 		return formatted, err
+	}
+
+	switch iresult := iresult.(type) {
+	case map[interface{}]interface{}:
+		result = convertKeysToStrings(iresult)
+	case map[string]interface{}:
+		if isKeyInteger(iresult) {
+			return formatCode("map[int64]" + typeForValue(mergeElements(iresult), structName, tags, subStructMap))
+		} else {
+			result = iresult
+		}
+	case []interface{}:
+		return formatCode(typeForValue(iresult, structName, tags, subStructMap))
 	default:
 		return nil, fmt.Errorf("unexpected type: %T", iresult)
 	}
@@ -322,6 +330,10 @@ func generateTypes(obj map[string]interface{}, structName string, tags []string,
 			}
 			valueType = subName
 		case map[string]interface{}:
+			if isKeyInteger(value) {
+				break
+			}
+
 			sub := generateTypes(value, structName, tags, depth+1, subStructMap) + "}"
 			subName := sub
 
@@ -470,6 +482,15 @@ func lintFieldName(name string) string {
 	return string(runes)
 }
 
+func isKeyInteger(object map[string]interface{}) bool {
+	for k, _ := range object {
+		if _, err := strconv.Atoi(k); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
 // generate an appropriate struct type entry
 func typeForValue(value interface{}, structName string, tags []string, subStructMap map[string]string) string {
 	//Check if this is an array
@@ -485,6 +506,9 @@ func typeForValue(value interface{}, structName string, tags []string, subStruct
 	} else if object, ok := value.(map[interface{}]interface{}); ok {
 		return generateTypes(convertKeysToStrings(object), structName, tags, 0, subStructMap) + "}"
 	} else if object, ok := value.(map[string]interface{}); ok {
+		if isKeyInteger(object) {
+			return "map[int64]" + typeForValue(mergeElements(object), structName, tags, subStructMap)
+		}
 		return generateTypes(object, structName, tags, 0, subStructMap) + "}"
 	} else if reflect.TypeOf(value) == nil {
 		return "interface{}"
@@ -534,6 +558,12 @@ func mergeElements(i interface{}) interface{} {
 			i[0] = mergeObjects(i[0], i[j])
 		}
 		return i[0:1]
+	case map[string]interface{}:
+		var r interface{}
+		for _, v := range i {
+			r = mergeObjects(r, v)
+		}
+		return r
 	}
 }
 
