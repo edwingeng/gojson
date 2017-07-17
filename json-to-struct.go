@@ -266,6 +266,9 @@ func convertKeysToStrings(obj map[interface{}]interface{}) map[string]interface{
 	res := make(map[string]interface{})
 
 	for k, v := range obj {
+		if k == "__isMap" {
+			continue
+		}
 		res[fmt.Sprintf("%v", k)] = v
 	}
 
@@ -278,6 +281,9 @@ func generateTypes(obj map[string]interface{}, structName string, tags []string,
 
 	keys := make([]string, 0, len(obj))
 	for key := range obj {
+		if key == "__isMap" {
+			continue
+		}
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
@@ -331,6 +337,9 @@ func generateTypes(obj map[string]interface{}, structName string, tags []string,
 			valueType = subName
 		case map[string]interface{}:
 			if isKeyInteger(value) {
+				break
+			}
+			if isMap(value) {
 				break
 			}
 
@@ -484,11 +493,25 @@ func lintFieldName(name string) string {
 
 func isKeyInteger(object map[string]interface{}) bool {
 	for k, _ := range object {
+		if k == "__isMap" {
+			continue
+		}
 		if _, err := strconv.Atoi(k); err != nil {
 			return false
 		}
 	}
 	return true
+}
+
+func isMap(object map[string]interface{}) bool {
+	for k, v := range object {
+		if k == "__isMap" {
+			if b, ok := v.(bool); ok && b {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // generate an appropriate struct type entry
@@ -507,7 +530,12 @@ func typeForValue(value interface{}, structName string, tags []string, subStruct
 		return generateTypes(convertKeysToStrings(object), structName, tags, 0, subStructMap) + "}"
 	} else if object, ok := value.(map[string]interface{}); ok {
 		if isKeyInteger(object) {
-			return "map[int64]" + typeForValue(mergeElements(object), structName, tags, subStructMap)
+			keyType := "int64"
+			return "map[" + keyType + "]" + typeForValue(mergeElements(object), structName, tags, subStructMap)
+		}
+		if isMap(object) {
+			keyType := "string"
+			return "map[" + keyType + "]" + typeForValue(mergeElements(object), structName, tags, subStructMap)
 		}
 		return generateTypes(object, structName, tags, 0, subStructMap) + "}"
 	} else if reflect.TypeOf(value) == nil {
@@ -560,7 +588,10 @@ func mergeElements(i interface{}) interface{} {
 		return i[0:1]
 	case map[string]interface{}:
 		var r interface{}
-		for _, v := range i {
+		for k, v := range i {
+			if k == "__isMap" {
+				continue
+			}
 			r = mergeObjects(r, v)
 		}
 		return r
@@ -592,6 +623,9 @@ func mergeObjects(o1, o2 interface{}) interface{} {
 	case map[string]interface{}:
 		if i2, ok := o2.(map[string]interface{}); ok {
 			for k, v := range i2 {
+				if k == "__isMap" {
+					continue
+				}
 				if v2, ok := i[k]; ok {
 					i[k] = mergeObjects(v2, v)
 				} else {
@@ -603,6 +637,9 @@ func mergeObjects(o1, o2 interface{}) interface{} {
 	case map[interface{}]interface{}:
 		if i2, ok := o2.(map[interface{}]interface{}); ok {
 			for k, v := range i2 {
+				if k == "__isMap" {
+					continue
+				}
 				if v2, ok := i[k]; ok {
 					i[k] = mergeObjects(v2, v)
 				} else {
