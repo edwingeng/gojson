@@ -492,6 +492,7 @@ func lintFieldName(name string) string {
 }
 
 func isKeyInteger(object map[string]interface{}) bool {
+	n := 0
 	for k, _ := range object {
 		if k == "__isMap" {
 			continue
@@ -499,8 +500,9 @@ func isKeyInteger(object map[string]interface{}) bool {
 		if _, err := strconv.Atoi(k); err != nil {
 			return false
 		}
+		n++
 	}
-	return true
+	return n > 0
 }
 
 func isMap(object map[string]interface{}) bool {
