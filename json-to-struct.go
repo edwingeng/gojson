@@ -151,6 +151,8 @@ var commonInitialisms = map[string]bool{
 	"XML":   true,
 	"NTP":   true,
 	"DB":    true,
+	"TCP":   true,
+	"UDP":   true,
 }
 
 var intToWordMap = []string{
