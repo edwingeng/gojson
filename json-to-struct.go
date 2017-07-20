@@ -557,7 +557,7 @@ func typeForValue(value interface{}, structName string, tags []string, subStruct
 func disambiguateFloatInt(value interface{}) string {
 	const epsilon = .0001
 	vfloat := value.(float64)
-	if !ForceFloats && math.Abs(vfloat-math.Floor(vfloat+epsilon)) < epsilon {
+	if !ForceFloats && math.Abs(vfloat-math.Floor(vfloat)) < epsilon {
 		var tmp int64
 		return reflect.TypeOf(tmp).Name()
 	}
@@ -652,5 +652,16 @@ func mergeObjects(o1, o2 interface{}) interface{} {
 			}
 		}
 		return i
+	case float64:
+		const epsilon = .0001
+		f1 := o1.(float64)
+		if math.Abs(f1-math.Floor(f1)) >= epsilon {
+			return o1
+		}
+		f2 := o2.(float64)
+		if math.Abs(f2-math.Floor(f2)) >= epsilon {
+			return o2
+		}
+		return o1
 	}
 }
