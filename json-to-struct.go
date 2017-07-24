@@ -279,7 +279,12 @@ func convertKeysToStrings(obj map[interface{}]interface{}) map[string]interface{
 
 // Generate go struct entries for a map[string]interface{} structure
 func generateTypes(obj map[string]interface{}, structName string, tags []string, depth int, subStructMap map[string]string) string {
-	structure := "struct {"
+	var structure string
+	if depth == 0 {
+		structure = "struct {"
+	} else {
+		structure = "*struct {"
+	}
 
 	keys := make([]string, 0, len(obj))
 	for key := range obj {
