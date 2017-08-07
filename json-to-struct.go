@@ -214,7 +214,7 @@ func Generate(input io.Reader, parser Parser, structName, pkgName string, tags [
 		return nil, err
 	}
 
-	formatCode := func (t string) ([]byte, error) {
+	formatCode := func(t string) ([]byte, error) {
 		src := fmt.Sprintf("package %s\n\ntype %s %s\n",
 			pkgName,
 			structName,
@@ -232,10 +232,18 @@ func Generate(input io.Reader, parser Parser, structName, pkgName string, tags [
 	case map[string]interface{}:
 		if isKeyInteger(iresult) {
 			keyType := "int64"
-			return formatCode("map[" + keyType + "]" + typeForValue(mergeElements(iresult), structName, tags, subStructMap))
+			valType := typeForValue(mergeElements(iresult), structName, tags, subStructMap)
+			if strings.HasPrefix(valType, "struct") {
+				valType = "*" + valType
+			}
+			return formatCode("map[" + keyType + "]" + valType)
 		} else if isMap(iresult) {
 			keyType := "string"
-			return formatCode("map[" + keyType + "]" + typeForValue(mergeElements(iresult), structName, tags, subStructMap))
+			valType := typeForValue(mergeElements(iresult), structName, tags, subStructMap)
+			if strings.HasPrefix(valType, "struct") {
+				valType = "*" + valType
+			}
+			return formatCode("map[" + keyType + "]" + valType)
 		} else {
 			result = iresult
 		}
@@ -283,11 +291,9 @@ func convertKeysToStrings(obj map[interface{}]interface{}) map[string]interface{
 
 // Generate go struct entries for a map[string]interface{} structure
 func generateTypes(obj map[string]interface{}, structName string, tags []string, depth int, subStructMap map[string]string) string {
-	var structure string
-	if depth == 0 {
-		structure = "struct {"
-	} else {
-		structure = "*struct {"
+	structure := "struct {"
+	if depth > 0 {
+		structure = "*" + structure
 	}
 
 	keys := make([]string, 0, len(obj))
@@ -544,11 +550,19 @@ func typeForValue(value interface{}, structName string, tags []string, subStruct
 	} else if object, ok := value.(map[string]interface{}); ok {
 		if isKeyInteger(object) {
 			keyType := "int64"
-			return "map[" + keyType + "]" + typeForValue(mergeElements(object), structName, tags, subStructMap)
+			valType := typeForValue(mergeElements(object), structName, tags, subStructMap)
+			if strings.HasPrefix(valType, "struct") {
+				valType = "*" + valType
+			}
+			return "map[" + keyType + "]" + valType
 		}
 		if isMap(object) {
 			keyType := "string"
-			return "map[" + keyType + "]" + typeForValue(mergeElements(object), structName, tags, subStructMap)
+			valType := typeForValue(mergeElements(object), structName, tags, subStructMap)
+			if strings.HasPrefix(valType, "struct") {
+				valType = "*" + valType
+			}
+			return "map[" + keyType + "]" + valType
 		}
 		return generateTypes(object, structName, tags, 0, subStructMap) + "}"
 	} else if reflect.TypeOf(value) == nil {
