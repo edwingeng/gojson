@@ -231,7 +231,11 @@ func Generate(input io.Reader, parser Parser, structName, pkgName string, tags [
 		result = convertKeysToStrings(iresult)
 	case map[string]interface{}:
 		if isKeyInteger(iresult) {
-			return formatCode("map[int64]" + typeForValue(mergeElements(iresult), structName, tags, subStructMap))
+			keyType := "int64"
+			return formatCode("map[" + keyType + "]" + typeForValue(mergeElements(iresult), structName, tags, subStructMap))
+		} else if isMap(iresult) {
+			keyType := "string"
+			return formatCode("map[" + keyType + "]" + typeForValue(mergeElements(iresult), structName, tags, subStructMap))
 		} else {
 			result = iresult
 		}
