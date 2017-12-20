@@ -208,6 +208,7 @@ func Generate(input io.Reader, parser Parser, structName, pkgName string, tags [
 	}
 
 	var result map[string]interface{}
+	var substructName = structName + "Item"
 
 	iresult, err := parser(input)
 	if err != nil {
@@ -215,7 +216,7 @@ func Generate(input io.Reader, parser Parser, structName, pkgName string, tags [
 	}
 
 	formatCode := func(t string) ([]byte, error) {
-		src := fmt.Sprintf("package %s\n\ntype %s %s\n",
+		src := fmt.Sprintf("package %s\n\n// easyjson:json\ntype %s %s\n",
 			pkgName,
 			structName,
 			t)
@@ -230,25 +231,26 @@ func Generate(input io.Reader, parser Parser, structName, pkgName string, tags [
 	case map[interface{}]interface{}:
 		result = convertKeysToStrings(iresult)
 	case map[string]interface{}:
+		keyType := ""
 		if isKeyInteger(iresult) {
-			keyType := "int64"
-			valType := typeForValue(mergeElements(iresult), structName, tags, subStructMap)
-			if strings.HasPrefix(valType, "struct") {
-				valType = "*" + valType
-			}
-			return formatCode("map[" + keyType + "]" + valType)
+			keyType = "int64"
 		} else if isMap(iresult) {
-			keyType := "string"
-			valType := typeForValue(mergeElements(iresult), structName, tags, subStructMap)
-			if strings.HasPrefix(valType, "struct") {
-				valType = "*" + valType
-			}
-			return formatCode("map[" + keyType + "]" + valType)
+			keyType = "string"
 		} else {
 			result = iresult
+			break
 		}
+		valType := typeForValue(mergeElements(iresult), structName, tags, subStructMap)
+		if strings.HasPrefix(valType, "struct") {
+			valType = fmt.Sprintf("*%s\n\ntype %s struct%s", substructName, substructName, strings.TrimPrefix(valType, "struct"))
+		}
+		return formatCode("map[" + keyType + "]" + valType)
 	case []interface{}:
-		return formatCode(typeForValue(iresult, structName, tags, subStructMap))
+		valType := typeForValue(iresult, structName, tags, subStructMap)
+		if strings.HasPrefix(valType, "[]struct") {
+			valType = fmt.Sprintf("[]*%s\n\ntype %s struct%s", substructName, substructName, strings.TrimPrefix(valType, "[]struct"))
+		}
+		return formatCode(valType)
 	default:
 		return nil, fmt.Errorf("unexpected type: %T", iresult)
 	}
@@ -523,11 +525,9 @@ func isKeyInteger(object map[string]interface{}) bool {
 }
 
 func isMap(object map[string]interface{}) bool {
-	for k, v := range object {
+	for k := range object {
 		if k == "__isMap" {
-			if b, ok := v.(bool); ok && b {
-				return true
-			}
+			return true
 		}
 	}
 	return false
